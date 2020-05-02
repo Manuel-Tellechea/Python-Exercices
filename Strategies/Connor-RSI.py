@@ -29,6 +29,7 @@ import pandas as pd
 # print(f'Final Portfolio Value: {cerebro.broker.getvalue():.2f}')
 # cerebro.plot(iplot=True, volume=False)
 
+
 class Streak(bt.ind.PeriodN):
     '''
     Keeps a counter of the current upwards/downwards/neutral streak
@@ -78,6 +79,7 @@ class MyStrategy(bt.Strategy):
         elif self.myind.crsi[0] >= 90:
             self.sell()
 
+
 if __name__ == '__main__':
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(1337.0)
@@ -106,9 +108,10 @@ data = bt.feeds.YahooFinanceCSVData(dataname='AAPL.csv',
                                     fromdate=datetime(2017, 1, 1),
                                     todate=datetime(2020, 4, 30))
 
+
 cerebro.adddata(data)
 cerebro.addstrategy(MyStrategy)
 print('Starting Port folio Value: %.2f' % cerebro.broker.getvalue())
 cerebro.run()
 print('Ending Portfolio Value: %.2f' % cerebro.broker.getvalue())
-cerebro.plot()
+cerebro.plot(style='candlestick')
