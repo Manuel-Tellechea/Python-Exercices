@@ -9,36 +9,6 @@ from bokeh.plotting import figure, show
 from stockstats import StockDataFrame as Sdf
 from bokeh.models import ColumnDataSource, HoverTool, CrosshairTool
 
-# def utils():
-#     # Please, comment this function after development phase
-#
-#     # Hide Pandas Future Warning
-#     warnings.simplefilter(action='ignore', category=FutureWarning)
-#     pd.options.mode.chained_assignment = None
-#
-#     MONGO_CLIENT = pymongo.MongoClient(
-#         "mongodb://10.8.0.1:27077/",  # mongodb://172.16.21.2:27077/
-#         username='your_user',
-#         password='your_password',
-#         authSource='admin')
-#     MONGO_DB = MONGO_CLIENT["server_skynet"]
-#
-#     pd.set_option('display.max_columns', 500)
-#     pd.set_option('display.max_rows', 5000)
-#     pd.set_option('display.width', 1000)
-#
-#     parameters = [0.20, 0.20]
-#     capital = 500000
-#     direction = 'Long'
-#     symbol = 'LB'
-#
-#     df_data = pd.read_csv('your_historical_data.csv')
-#
-#     instrument_collection = MONGO_DB["Instrument"]
-#     instrument_details = instrument_collection.find_one({'symbol': symbol})
-#
-#     return df_data, parameters, instrument_details, capital, direction
-
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.max_rows', 5000)
 pd.set_option('display.width', 1000)
@@ -48,18 +18,18 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 pd.options.mode.chained_assignment = None
 
 # Variables
-object_variables = {'symbols_1': 'ES',
+object_variables = {'symbols_1': 'CL',
                     'temporality': '1H',
-                    'fee': 7,
-                    'tick_size': 0.01,
-                    'contract_size': 1000,
-                    'direction': 'Long',
+                    'fee': 1.52,
+                    'tick_size': 0.1,
+                    'contract_size': 100,
+                    'direction': 'Short',
                     'capital': 500000,
                     'margin': 5600,
                     'strategy_name': 'streak_duration',
-                    'parameters': {'profit_target': [0.005],
-                                   'zs_value': [2],
-                                   'periods': [100],
+                    'parameters': {'profit_target': [0.01],
+                                   'zv_value': [2],
+                                   'periods': [50],
                                    'stop_loss': [0.005]}}
 
 
@@ -85,8 +55,7 @@ def resample_data(data: pd.DataFrame, time: str):
 
     return data_ohlc
 
-
-def long_direction(df_data, object_variables, take_profit, zs_value, stop_loss):
+def long_direction(df_data, object_variables, take_profit, zv_value, stop_loss):
     capital = float(object_variables["capital"])
     capital_line = [capital]
     condition = False
@@ -98,7 +67,7 @@ def long_direction(df_data, object_variables, take_profit, zs_value, stop_loss):
     for i in range(max_periods, len(df_data)):
 
         # ENTRY LONG CONDITION
-        if not condition and df_data['z_streak'][i] <= zs_value * -1:
+        if not condition and df_data['zv'][i] >= zv_value and df_data['close'][i] > df_data['open'][i]:
 
             if i + 1 < len(df_data):
 
@@ -122,7 +91,7 @@ def long_direction(df_data, object_variables, take_profit, zs_value, stop_loss):
 
                 condition = True
 
-                dfm_aux = pd.DataFrame([{'entry_date': entry_date, 'exit_date': '', 'entry_price': entry_price,
+                dfm_aux = pd.DataFrame([{'entry_date': str(entry_date), 'exit_date': '', 'entry_price': entry_price,
                                          'exit_price': np.NaN, 'quantity': position_size, 'fee': total_fee,
                                          'capital': '', 'mae': '', 'quantity_active': margin_total, 'profit_loss': ''}])
 
@@ -145,7 +114,7 @@ def long_direction(df_data, object_variables, take_profit, zs_value, stop_loss):
                     capital_line.append(capital)
 
                     df_trades.at[df_trades.index[-1], 'mae'] = 0
-                    df_trades.at[df_trades.index[-1], 'exit_date'] = exit_date
+                    df_trades.at[df_trades.index[-1], 'exit_date'] = str(exit_date)
                     df_trades.at[df_trades.index[-1], 'exit_price'] = exit_price
                     df_trades.at[df_trades.index[-1], 'capital'] = capital_line[-1]
                     df_trades.at[df_trades.index[-1], 'profit_loss'] = profit_loss
@@ -191,7 +160,7 @@ def long_direction(df_data, object_variables, take_profit, zs_value, stop_loss):
                     mae = (min_price / entry_price) - 1
 
                     df_trades.at[df_trades.index[-1], 'mae'] = mae
-                    df_trades.at[df_trades.index[-1], 'exit_date'] = exit_date
+                    df_trades.at[df_trades.index[-1], 'exit_date'] = str(exit_date)
                     df_trades.at[df_trades.index[-1], 'exit_price'] = exit_price
                     df_trades.at[df_trades.index[-1], 'capital'] = capital_line[-1]
                     df_trades.at[df_trades.index[-1], 'profit_loss'] = profit_loss
@@ -217,7 +186,7 @@ def long_direction(df_data, object_variables, take_profit, zs_value, stop_loss):
     return df_trades, capital_line
 
 
-def short_direction(df_data, object_variables, take_profit, zs_value, stop_loss):
+def short_direction(df_data, object_variables, take_profit, zv_value,  stop_loss):
     capital = float(object_variables["capital"])
     capital_line = [capital]
     condition = False
@@ -229,7 +198,7 @@ def short_direction(df_data, object_variables, take_profit, zs_value, stop_loss)
     for i in range(max_periods, len(df_data)):
 
         # ENTRY SHORT CONDITION
-        if not condition and df_data['z_streak'][i] >= zs_value:
+        if not condition and df_data['zv'][i] >= zv_value and df_data['close'][i] < df_data['open'][i]:
 
             if i + 1 < len(df_data):
 
@@ -253,7 +222,7 @@ def short_direction(df_data, object_variables, take_profit, zs_value, stop_loss)
 
                 condition = True
 
-                dfm_aux = pd.DataFrame([{'entry_date': entry_date, 'exit_date': '', 'entry_price': entry_price,
+                dfm_aux = pd.DataFrame([{'entry_date': str(entry_date), 'exit_date': '', 'entry_price': entry_price,
                                          'exit_price': np.NaN, 'quantity': position_size, 'fee': total_fee,
                                          'capital': '', 'mae': '', 'quantity_active': margin_total, 'profit_loss': ''}])
 
@@ -276,25 +245,25 @@ def short_direction(df_data, object_variables, take_profit, zs_value, stop_loss)
                     capital_line.append(capital)
 
                     df_trades.at[df_trades.index[-1], 'mae'] = 0
-                    df_trades.at[df_trades.index[-1], 'exit_date'] = exit_date
+                    df_trades.at[df_trades.index[-1], 'exit_date'] = str(exit_date)
                     df_trades.at[df_trades.index[-1], 'exit_price'] = exit_price
                     df_trades.at[df_trades.index[-1], 'capital'] = capital_line[-1]
                     df_trades.at[df_trades.index[-1], 'profit_loss'] = profit_loss
                     df_trades.at[df_trades.index[-1], 'exit_type'] = 'StopLoss'
                     df_trades.at[df_trades.index[-1], 'trade_direction'] = 'Short'
 
-                    print("---------- Trade details ----------")
-                    print('exit_type: STOPLOSS')
-                    print(f'entry_price: {entry_price}')
-                    print(f'exit_price: {exit_price}')
-                    print(f'position_size: {position_size}')
-                    print(f'entry_position_size_usd: {entry_position_size_usd}')
-                    print(f'exit_position_size_usd: {exit_position_size_usd}')
-                    print(f'fee: {total_fee}')
-                    print(f'profit_loss: {profit_loss}')
-                    print(f'capital: {capital}')
-                    print(Fore.GREEN + 'entry_date: ' + Fore.WHITE + f'{entry_date}')
-                    print(Fore.RED + 'exit_date: ' + Fore.WHITE + f'{exit_date}\n')
+                    # print("---------- Trade details ----------")
+                    # print('exit_type: STOPLOSS')
+                    # print(f'entry_price: {entry_price}')
+                    # print(f'exit_price: {exit_price}')
+                    # print(f'position_size: {position_size}')
+                    # print(f'entry_position_size_usd: {entry_position_size_usd}')
+                    # print(f'exit_position_size_usd: {exit_position_size_usd}')
+                    # print(f'fee: {total_fee}')
+                    # print(f'profit_loss: {profit_loss}')
+                    # print(f'capital: {capital}')
+                    # print(Fore.GREEN + 'entry_date: ' + Fore.WHITE + f'{entry_date}')
+                    # print(Fore.RED + 'exit_date: ' + Fore.WHITE + f'{exit_date}\n')
 
                     df_trades.reset_index(inplace=True, drop=True)
                     continue
@@ -323,25 +292,25 @@ def short_direction(df_data, object_variables, take_profit, zs_value, stop_loss)
                     mae = (min_price / entry_price) - 1
 
                     df_trades.at[df_trades.index[-1], 'mae'] = mae
-                    df_trades.at[df_trades.index[-1], 'exit_date'] = exit_date
+                    df_trades.at[df_trades.index[-1], 'exit_date'] = str(exit_date)
                     df_trades.at[df_trades.index[-1], 'exit_price'] = exit_price
                     df_trades.at[df_trades.index[-1], 'capital'] = capital_line[-1]
                     df_trades.at[df_trades.index[-1], 'profit_loss'] = profit_loss
                     df_trades.at[df_trades.index[-1], 'exit_type'] = 'ExitShort'
                     df_trades.at[df_trades.index[-1], 'trade_direction'] = 'Short'
 
-                    print("---------- Trade details ----------")
-                    print('exit_type: EXITSHORT')
-                    print(f'entry_price: {entry_price}')
-                    print(f'exit_price: {exit_price}')
-                    print(f'position_size: {position_size}')
-                    print(f'entry_position_size_usd: {entry_position_size_usd}')
-                    print(f'exit_position_size_usd: {exit_position_size_usd}')
-                    print(f'fee: {total_fee}')
-                    print(f'profit_loss: {profit_loss}')
-                    print(f'capital: {capital}')
-                    print(Fore.GREEN + 'entry_date: ' + Fore.WHITE + f'{entry_date}')
-                    print(Fore.RED + 'exit_date: ' + Fore.WHITE + f'{exit_date}\n')
+                    # print("---------- Trade details ----------")
+                    # print('exit_type: EXITSHORT')
+                    # print(f'entry_price: {entry_price}')
+                    # print(f'exit_price: {exit_price}')
+                    # print(f'position_size: {position_size}')
+                    # print(f'entry_position_size_usd: {entry_position_size_usd}')
+                    # print(f'exit_position_size_usd: {exit_position_size_usd}')
+                    # print(f'fee: {total_fee}')
+                    # print(f'profit_loss: {profit_loss}')
+                    # print(f'capital: {capital}')
+                    # print(Fore.GREEN + 'entry_date: ' + Fore.WHITE + f'{entry_date}')
+                    # print(Fore.RED + 'exit_date: ' + Fore.WHITE + f'{exit_date}\n')
 
                     df_trades.reset_index(inplace=True, drop=True)
                     continue
@@ -350,8 +319,9 @@ def short_direction(df_data, object_variables, take_profit, zs_value, stop_loss)
 
 
 def strategy(data: pd.DataFrame, parameters: list, object_variables):
-    variable1 = float(parameters[0])  # take_profit
-    variable2 = float(parameters[1])  # z_streak
+
+    variable1 = float(parameters[0])  # take profit
+    variable2 = float(parameters[1])  # zv_value
     variable3 = float(parameters[2])  # periods
     variable4 = float(parameters[3])  # stop_loss
 
@@ -360,36 +330,17 @@ def strategy(data: pd.DataFrame, parameters: list, object_variables):
     df_data.reset_index(inplace=True)
     df_data.date = pd.to_datetime(df_data.date)
 
-    def standarize(df, column, periods=0):
+    def standarize(df_data, column='gap', periods=0):
         if periods == 0:
-            df_data['z_' + column] = (df[column] - df[column].expanding().mean()) / df[column].expanding().std()
+            df_data['z_' + column] = (df_data[column] - df_data[column].expanding().mean()) / df_data[
+                column].expanding().std()
 
         if periods > 0:
-            df_data['z_' + column] = (df[column] - df[column].rolling(periods).mean()) / df[column].rolling(periods).std()
-        return df
+            df_data['z_' + column] = (df_data[column] - df_data[column].rolling(periods).mean()) / df_data[
+                column].rolling(periods).std()
+        return df_data
 
-    # Streak
-    cur_streak = 0
-    df_data['streak'] = 0
-    for i in range(len(df_data)):
-        if i == 0:
-            continue
-
-        if df_data.close[i] > df_data.close[i - 1]:
-            cur_streak = max(0, cur_streak)
-            cur_streak += 1
-            df_data['streak'].iloc[i] = cur_streak
-        elif df_data.close[i] < df_data.close[i - 1]:
-            cur_streak = min(0, cur_streak)
-            cur_streak += -1
-            df_data['streak'].iloc[i] = cur_streak
-        else:
-            cur_streak = 0
-            df_data['streak'].iloc[i] = cur_streak
-
-    # Standarization
-
-    df_data = standarize(df_data, column='streak', periods=int(variable3))
+    df_data = standarize(df_data, 'volume', int(variable3))
 
     df_data.dropna(inplace=True)
     df_data.reset_index(inplace=True)
@@ -400,15 +351,13 @@ def strategy(data: pd.DataFrame, parameters: list, object_variables):
     elif object_variables["direction"] == 'Short':
         df_trades, capital_line = short_direction(df_data, object_variables, variable1, variable2, variable4)
 
-    if len(df_trades) > 10:
+    if len(df_trades) > 1:
         df_trades.reset_index(inplace=True, drop=True)
         df_trades['type_trade'] = 'Backtesting'
         df_trades = df_trades[np.isfinite(df_trades['exit_price'])]
     else:
         df_trades = pd.DataFrame()
 
-    df_data.to_csv(f'{"data"}.csv')
-    df_trades.to_csv(f'{"trades"}.csv')
     return df_trades, capital_line
 
 
@@ -516,10 +465,14 @@ def get_stats(trades: pd.DataFrame(), capital_line: list):
         "drawdown_recovery": drawdown_recovery
     })
 
+    del results_isi_par_row["drawdown_recovery"]
+    del results_isi_par_row["noise"]
+
     return results_isi_par_row
 
 
 def get_scores(stats):
+
     min_risk_return = stats.risk_return.min()
     diff_risk_return = stats.risk_return.max() - min_risk_return
 
@@ -541,6 +494,7 @@ def get_scores(stats):
 
 
 def optimization(parameter_combinations, data_resampled):
+
     is_stats = pd.DataFrame()
 
     for parameter in parameter_combinations:
@@ -571,6 +525,7 @@ def optimization(parameter_combinations, data_resampled):
 
 
 def graphic_validation(trades, data_resampled):
+
     # Candlestick
     inc = data_resampled.close > data_resampled.open
     dec = data_resampled.open > data_resampled.close
@@ -617,8 +572,7 @@ def graphic_validation(trades, data_resampled):
     crosshair = CrosshairTool(dimensions='both')
 
     # Figures
-    p = figure(x_axis_type="datetime", plot_height=500, plot_width=1000,
-               title=object_variables["symbols_1"] + " " + object_variables["direction"])
+    p = figure(x_axis_type="datetime", plot_height=500, plot_width=1000, title="PRICES")
 
     p.segment(data_resampled.date, data_resampled.high, data_resampled.date, data_resampled.low, color="black")
     p.vbar(data_resampled.date[inc], w, data_resampled.open[inc], data_resampled.close[inc], fill_color="green",
@@ -644,6 +598,7 @@ def graphic_validation(trades, data_resampled):
 
 
 if __name__ == '__main__':
+
     stoploss_values = object_variables["parameters"]["stop_loss"]
     del object_variables["parameters"]["stop_loss"]
     object_variables["parameters"]["stop_loss"] = stoploss_values
@@ -661,3 +616,24 @@ if __name__ == '__main__':
     data_resampled = resample_data(is_data, object_variables["temporality"])
 
     optimization(parameter_combinations, data_resampled)
+
+
+
+class Streak(bt.ind.PeriodN):
+    '''
+    Keeps a counter of the current upwards/downwards/neutral streak
+    '''
+    lines = ('streak',)
+    params = dict(period=2)  # need prev/cur days (2) for comparisons
+
+    curstreak = 0
+
+    def next(self):
+        d0, d1 = self.data[0], self.data[-1]
+
+        if d0 > d1:
+            self.l.streak[0] = self.curstreak = max(1, self.curstreak + 1)
+        elif d0 < d1:
+            self.l.streak[0] = self.curstreak = min(-1, self.curstreak - 1)
+        else:
+            self.l.streak[0] = self.curstreak = 0
